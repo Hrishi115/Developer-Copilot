@@ -18,12 +18,12 @@ EXT_TO_LANGUAGE = {
 
 ALLOWED_EXTENSIONS = {
     ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".cpp", ".c",
-    ".html", ".css", ".json", ".yaml", ".yml", ".md", ".txt"
+    ".html", ".css", ".json", ".yaml", ".yml", ".md", ".txt", ".ipynb"
 }
 IGNORED_DIRS = {"migrations", "alembic", "node_modules", "dist", "build", ".vite"}
 IGNORED_FILES = {"package-lock.json", "yarn.lock", "pnpm-lock.yaml", "vite.config.js", 
                 "vite.config.ts", "eslint.config.js", "package.json", "tsconfig.json", 
-                "webpack.config.js", "babel.config.js"}
+                "webpack.config.js", "babel.config.js","components.json", "config.js", ".config.js", "jsconfig.json"}
 
 def should_load(path: str) -> bool:
     parts = path.split("/")
@@ -62,36 +62,53 @@ def load_documents(repo_name: str) -> list:
             documents.append(
                 Document(page_content=content, metadata={"source": path, "repo": repo_name, "Language": ext.lstrip(".")})
             )
+            print(f"Loaded: {path}")
         
-    with open("documents.txt", "w", encoding="utf-8") as f:
-        for doc in documents:
-            f.write(f"Source: {doc.metadata['source']}\n")
-            f.write(f"Repo: {doc.metadata['repo']}\n")
-            f.write(f"Content:\n{doc.page_content}\n")
-            f.write("-" * 80 + "\n")
+    # with open("documents.txt", "w", encoding="utf-8") as f:
+    #     for doc in documents:
+    #         f.write(f"Source: {doc.metadata['source']}\n")
+    #         f.write(f"Repo: {doc.metadata['repo']}\n")
+    #         f.write(f"Content:\n{doc.page_content}\n")
+    #         f.write("-" * 80 + "\n")
 
     return documents
 
 
 def chunking_documents(documents: list, chunk_size=800, chunk_overlap=100) -> list:
-    """This function chunks the documents into smaller pieces."""
     chunks = []
-    text_splitter = RecursiveCharacterTextSplitter(
-        separators=["\nclass ", "\ndef ","\nasync def ","\n@","\n\n"],
-        chunk_size=800,
-        chunk_overlap=100
-    )
+    
     for doc in documents:
-        # ext = "." + doc.metadata.get("Language", "text").lower()
-        # lang = EXT_TO_LANGUAGE.get(ext)
-        chunks.extend(text_splitter.split_documents([doc]))
+        ext = "." + doc.metadata.get("Language", "text").lower()
+        lang = EXT_TO_LANGUAGE.get(ext)
 
+        # Use language-aware splitter when possible
+        if lang:
+            splitter = RecursiveCharacterTextSplitter.from_language(
+                language=lang,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+            )
+        else:
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+            )
+
+        split = splitter.split_documents([doc])
+
+        # for chunk in split:
+        #     source = chunk.metadata.get("source", "")
+        #     # Prepend file path as context header — this is the key fix
+        #     chunk.page_content = f"# File: {source}\n\n{chunk.page_content}"
+
+        chunks.extend(split)
+    print("Chunking completed. Total chunks created:", len(chunks))
     return chunks
 
 def create_vector_store(chunks: list, persistent_directory: str = "db/chroma_db") -> None:
     """This function creates a vector store from the chunks."""
     
-    embeddings = OllamaEmbeddings(model="nomic-embed-text")
+    embeddings = OllamaEmbeddings(model="embeddinggemma")
 
     vector_store = Chroma.from_documents(
         embedding=embeddings,
@@ -100,11 +117,11 @@ def create_vector_store(chunks: list, persistent_directory: str = "db/chroma_db"
         collection_metadata={"hnsw:space": "cosine"},
     )
 
-    print("Created Vector Store")
+    print("Created Vector Store Successfully!")
 
     return vector_store
 
-if __name__ == "__main__":
+def ingest_pipeline():
 
     repo_name = input("Enter the GitHub repository name (e.g., owner/repo): ")
     docs = load_documents(repo_name)
