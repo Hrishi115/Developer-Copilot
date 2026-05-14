@@ -204,7 +204,7 @@ Understanding large codebases quickly and efficiently without wasting hours.
 ## 🧑‍💻 Author
 
 **Hrishikesh Shendage**\
-GitHub: [[https://github.com/Hrishi115](https://github.com/Hrishi115)
+GitHub: [[https://github.com/Hrishi115](https://github.com/Hrishi115)]
 
 ---
 
