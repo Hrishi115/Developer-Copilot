@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dev Copilot — Chat with your code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* ── Reset & Base ──────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-base:    #070b14;
+    --bg-surface: #0d1221;
+    --bg-panel:   #111827;
+    --bg-card:    #161d2e;
+    --bg-input:   #1a2236;
+    --bg-hover:   #1e2940;
+    --accent:     #3b82f6;
+    --accent-dim: rgba(59,130,246,0.15);
+    --accent-glow:rgba(59,130,246,0.25);
+    --border:     rgba(255,255,255,0.07);
+    --border-mid: rgba(255,255,255,0.12);
+    --text-hi:    #f0f4ff;
+    --text-md:    #8b9ab8;
+    --text-lo:    #4b5a78;
+    --success:    #22c55e;
+    --danger:     #ef4444;
+    --warn:       #f59e0b;
+    --radius-sm:  6px;
+    --radius-md:  10px;
+    --radius-lg:  14px;
+    --sidebar-w:  280px;
+    --header-h:   56px;
+    --font-ui:    'IBM Plex Sans', sans-serif;
+    --font-mono:  'IBM Plex Mono', monospace;
+    --transition: 0.18s cubic-bezier(.4,0,.2,1);
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: var(--font-ui);
+    background: var(--bg-base);
+    color: var(--text-hi);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Scrollbar ─────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 99px; }
+
+  /* ── Header ────────────────────────────────────────── */
+  #header {
+    height: var(--header-h);
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 12px;
+    flex-shrink: 0;
+    z-index: 10;
+    backdrop-filter: blur(12px);
+  }
+  #header .logo-icon {
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, #2563eb, #6366f1);
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 12px rgba(99,102,241,0.35);
+  }
+  #header .logo-icon svg { width: 18px; height: 18px; }
+  #header .logo-text { line-height: 1.2; }
+  #header .logo-text strong { font-size: 15px; font-weight: 600; display: block; }
+  #header .logo-text span  { font-size: 11px; color: var(--text-md); font-family: var(--font-mono); }
+  #header .spacer { flex: 1; }
+  #header .hdr-btn {
+    width: 34px; height: 34px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text-md);
+    transition: var(--transition);
+  }
+  #header .hdr-btn:hover { background: var(--bg-hover); color: var(--text-hi); border-color: var(--border-mid); }
+
+  /* ── Hamburger (mobile) ─────────────────────────────── */
+  #hamburger { display: none; }
+
+  /* ── Layout ─────────────────────────────────────────── */
+  #layout {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ─────────────────────────────────────────── */
+  #sidebar {
+    width: var(--sidebar-w);
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: transform var(--transition);
+    overflow: hidden;
+  }
+  #sidebar-head {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  #sidebar-head h2 { font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-md); flex: 1; }
+  .sidebar-icon-btn {
+    width: 26px; height: 26px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text-md);
+    transition: var(--transition);
+  }
+  .sidebar-icon-btn:hover { background: var(--bg-hover); color: var(--text-hi); }
+
+  #add-repo-form {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: slideDown .2s ease;
+  }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  #add-repo-form.hidden { display: none; }
+  .field-wrap { position: relative; }
+  .field-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-lo); width: 14px; height: 14px; }
+  .field-wrap input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-hi);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 8px 10px 8px 30px;
+    outline: none;
+    transition: var(--transition);
+  }
+  .field-wrap input::placeholder { color: var(--text-lo); }
+  .field-wrap input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+  .btn-add {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: var(--transition);
+  }
+  .btn-add:hover { background: #2563eb; }
+  .btn-add:active { transform: scale(.98); }
+  .btn-add.loading { opacity: .7; pointer-events: none; }
+
+  /* repo list */
+  #repo-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .repo-empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--text-lo);
+    font-size: 12px;
+    font-family: var(--font-mono);
+    line-height: 1.8;
+  }
+  .repo-item {
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex; align-items: flex-start; gap: 10px;
+    animation: repoIn .25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  @keyframes repoIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .repo-item::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    border-radius: 0 2px 2px 0;
+    opacity: 0;
+    transition: var(--transition);
+  }
+  .repo-item:hover { background: var(--bg-hover); border-color: var(--border-mid); }
+  .repo-item.active { background: var(--accent-dim); border-color: var(--accent); }
+  .repo-item.active::before { opacity: 1; }
+  .repo-icon {
+    width: 30px; height: 30px; flex-shrink: 0;
+    background: var(--bg-input);
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+  }
+  .repo-info { flex: 1; min-width: 0; }
+  .repo-name { font-size: 13px; font-weight: 500; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-hi); }
+  .repo-meta { font-size: 11px; color: var(--text-md); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+  .repo-branch { display: flex; align-items: center; gap: 3px; }
+  .repo-actions { display: flex; gap: 4px; opacity: 0; transition: var(--transition); }
+  .repo-item:hover .repo-actions { opacity: 1; }
+  .repo-act-btn {
+    width: 22px; height: 22px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text-md); font-size: 11px;
+    transition: var(--transition);
+  }
+  .repo-act-btn:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+  /* status dot */
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.ready   { background: var(--success); box-shadow: 0 0 4px var(--success); }
+  .status-dot.loading { background: var(--warn); animation: pulse 1s infinite; }
+  .status-dot.error   { background: var(--danger); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+
+  /* ── Chat Panel ──────────────────────────────────────── */
+  #chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-base);
+  }
+
+  /* chat topbar */
+  #chat-topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 20px; gap: 10px;
+    background: var(--bg-surface);
+    flex-shrink: 0;
+  }
+  #chat-topbar .repo-badge {
+    background: var(--accent-dim);
+    border: 1px solid rgba(59,130,246,0.3);
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+    display: flex; align-items: center; gap: 6px;
+  }
+  #chat-topbar .spacer { flex: 1; }
+  #chat-topbar .clear-btn {
+    font-size: 12px; font-family: var(--font-mono);
+    color: var(--text-lo);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 5px 10px;
+    cursor: pointer; transition: var(--transition);
+  }
+  #chat-topbar .clear-btn:hover { color: var(--text-hi); border-color: var(--border-mid); background: var(--bg-hover); }
+
+  /* messages */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* empty state */
+  #empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-lo);
+    padding: 40px;
+    text-align: center;
+    animation: fadeIn .5s ease;
+  }
+  #empty-state .empty-icon {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-mid);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-lo);
+    margin-bottom: 4px;
+  }
+  #empty-state h3 { font-size: 16px; color: var(--text-md); font-weight: 500; }
+  #empty-state p  { font-size: 13px; color: var(--text-lo); max-width: 300px; line-height: 1.7; }
+  #empty-state .quick-prompts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+  .quick-pill {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 7px 14px;
+    font-size: 12px; font-family: var(--font-mono);
+    color: var(--text-md);
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .quick-pill:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+  /* message bubble */
+  .msg-row {
+    display: flex;
+    padding: 6px 20px;
+    gap: 14px;
+    animation: msgIn .3s cubic-bezier(.2,.8,.2,1);
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .msg-row.user { flex-direction: row-reverse; }
+  .avatar {
+    width: 32px; height: 32px; flex-shrink: 0;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600;
+    margin-top: 2px;
+  }
+  .avatar.ai  { background: linear-gradient(135deg,#2563eb,#6366f1); color: #fff; font-size: 11px; }
+  .avatar.usr { background: var(--bg-card); border: 1px solid var(--border-mid); color: var(--text-md); font-size: 11px; }
+  .bubble {
+    max-width: min(72%, 640px);
+    padding: 10px 14px;
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+    line-height: 1.75;
+    border: 1px solid transparent;
+  }
+  .msg-row.user .bubble {
+    background: var(--accent);
+    color: #fff;
+    border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
+  }
+  .msg-row.ai .bubble {
+    background: var(--bg-card);
+    color: var(--text-hi);
+    border-color: var(--border);
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px;
+  }
+  .bubble code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .bubble pre {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin: 8px 0 0;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .msg-time { font-size: 10px; color: var(--text-lo); margin-top: 4px; font-family: var(--font-mono); }
+  .msg-row.user .msg-time { text-align: right; }
+
+  /* typing indicator */
+  #typing-row {
+    display: none;
+    padding: 6px 20px;
+    gap: 14px;
+    align-items: flex-start;
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto;
+    animation: msgIn .3s cubic-bezier(.2,.8,.2,1);
+  }
+  #typing-row.show { display: flex; }
+  .typing-bubble {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px;
+    padding: 10px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .typing-dots { display: flex; gap: 5px; align-items: center; }
+  .typing-dots span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-lo);
+    animation: dotBounce 1.3s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: .2s; }
+  .typing-dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes dotBounce {
+    0%,60%,100% { transform: translateY(0); background: var(--text-lo); }
+    30%          { transform: translateY(-5px); background: var(--accent); }
+  }
+  .typing-status { font-size: 11px; color: var(--text-lo); font-family: var(--font-mono); }
+  #typing-status-text { transition: opacity .3s; }
+
+  /* ── Input Area ─────────────────────────────────────── */
+  #input-area {
+    padding: 16px 20px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+    flex-shrink: 0;
+  }
+  #input-wrap {
+    max-width: 820px;
+    margin: 0 auto;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 10px 12px;
+    transition: var(--transition);
+  }
+  #input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  #msg-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-hi);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    resize: none;
+    line-height: 1.6;
+    max-height: 160px;
+    min-height: 22px;
+    scrollbar-width: thin;
+  }
+  #msg-input::placeholder { color: var(--text-lo); }
+  #send-btn {
+    width: 36px; height: 36px; flex-shrink: 0;
+    background: var(--accent);
+    border: none; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    transition: var(--transition);
+    align-self: flex-end;
+  }
+  #send-btn:hover:not(:disabled) { background: #2563eb; transform: scale(1.05); }
+  #send-btn:disabled { opacity: .4; pointer-events: none; }
+  #send-btn.loading { animation: spinBtn 1s linear infinite; }
+  @keyframes spinBtn { to { transform: rotate(360deg); } }
+  .input-hint { font-size: 11px; color: var(--text-lo); text-align: center; margin-top: 8px; font-family: var(--font-mono); }
+
+  /* ── Toast ──────────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--bg-card);
+    border: 1px solid var(--border-mid);
+    border-radius: var(--radius-md);
+    padding: 10px 18px;
+    font-size: 13px; color: var(--text-hi);
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .3s;
+    opacity: 0;
+    z-index: 100;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* ── Overlay (mobile) ───────────────────────────────── */
+  #overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 19;
+    backdrop-filter: blur(4px);
+  }
+
+  /* ── Responsive ──────────────────────────────────────── */
+  @media (max-width: 700px) {
+    :root { --sidebar-w: 260px; }
+    #sidebar {
+      position: fixed;
+      left: 0; top: 0; bottom: 0;
+      z-index: 20;
+      transform: translateX(-100%);
+    }
+    #sidebar.open { transform: translateX(0); box-shadow: 8px 0 32px rgba(0,0,0,.6); }
+    #overlay { display: block; opacity: 0; transition: opacity .25s; pointer-events: none; }
+    #overlay.show { opacity: 1; pointer-events: all; }
+    #hamburger { display: flex; }
+    #chat-topbar .desktop-only { display: none; }
+    .bubble { max-width: 85%; }
+    #input-area { padding: 12px 12px 16px; }
+  }
+
+  /* ── Fade in ─────────────────────────────────────────── */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .fade-in { animation: fadeIn .35s ease; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────── -->
+<header id="header">
+  <button class="hdr-btn" id="hamburger" aria-label="Toggle sidebar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="logo-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+  </div>
+  <div class="logo-text">
+    <strong>Dev Copilot</strong>
+    <span>Chat with your code</span>
+  </div>
+  <div class="spacer"></div>
+  <button class="hdr-btn desktop-only" id="theme-btn" title="Toggle theme" aria-label="Toggle theme">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+  </button>
+  <button class="hdr-btn" title="Profile" aria-label="Profile">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+  </button>
+</header>
+
+<!-- ── Layout ───────────────────────────────────────── -->
+<main id="layout">
+
+  <!-- Sidebar -->
+  <aside id="sidebar" role="complementary" aria-label="Repositories">
+    <div id="sidebar-head">
+      <h2>Repositories</h2>
+      <button class="sidebar-icon-btn" id="toggle-form-btn" title="Add repository" aria-label="Add repository">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+
+    <div id="add-repo-form" class="hidden" role="form" aria-label="Add repository">
+      <div class="field-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+        <input type="text" id="repo-input" placeholder="user/repo" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="field-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        <input type="text" id="branch-input" placeholder="branch (e.g. main)" autocomplete="off" spellcheck="false" value="main" />
+      </div>
+      <button class="btn-add" id="add-repo-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Repository
+      </button>
+    </div>
+
+    <div id="repo-list" role="list" aria-label="Repository list">
+      <div class="repo-empty" id="repo-empty">
+        <span style="font-size:18px;display:block;margin-bottom:6px;">∅</span>
+        No repositories yet.<br/>Add one to get started.
+      </div>
+    </div>
+  </aside>
+
+  <!-- Chat Panel -->
+  <section id="chat-panel" aria-label="Chat">
+
+    <!-- Topbar -->
+    <div id="chat-topbar">
+      <div id="active-repo-badge" style="display:none" class="repo-badge">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+        <span id="active-repo-name">—</span>
+      </div>
+      <div class="spacer"></div>
+      <button class="clear-btn desktop-only" id="clear-btn">clear chat</button>
+    </div>
+
+    <!-- Messages -->
+    <div id="messages" role="log" aria-live="polite" aria-label="Chat messages">
+      <div id="empty-state">
+        <div class="empty-icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3>No Repository Selected</h3>
+        <p>Select or add a GitHub repository from the left panel to start chatting with your code.</p>
+        <div class="quick-prompts" id="quick-prompts">
+          <button class="quick-pill" data-prompt="Explain the overall architecture of this codebase">explain architecture</button>
+          <button class="quick-pill" data-prompt="List all the API endpoints defined in this repo">list API endpoints</button>
+          <button class="quick-pill" data-prompt="Find potential bugs or code smells in this repo">find bugs</button>
+          <button class="quick-pill" data-prompt="Summarize the main dependencies used">summarize dependencies</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Typing indicator (outside #messages to avoid aria-live noise) -->
+    <div id="typing-row" role="status" aria-label="Assistant is thinking">
+      <div class="avatar ai" aria-hidden="true">AI</div>
+      <div class="typing-bubble">
+        <div class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="typing-status"><span id="typing-status-text">Analyzing your code…</span></div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div id="input-area">
+      <div id="input-wrap">
+        <textarea
+          id="msg-input"
+          rows="1"
+          placeholder="Ask anything about your code…"
+          aria-label="Message input"
+          disabled
+        ></textarea>
+        <button id="send-btn" aria-label="Send message" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <p class="input-hint">Enter to send · Shift+Enter for new line</p>
+    </div>
+  </section>
+</main>
+
+<!-- Mobile overlay -->
+<div id="overlay" aria-hidden="true"></div>
+
+<!-- Toast -->
+<div id="toast" role="alert" aria-live="assertive"></div>
+
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   CONFIG — point these at your actual backend endpoints
+═══════════════════════════════════════════════════════════ */
+const API = {
+  ingest: 'http://127.0.0.1:8000/ingest',   // POST /{user/repo}  → { message }
+  chat:   'http://127.0.0.1:8000/retrieval', // POST /  { query, repo }  → { response }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════ */
+let repos     = JSON.parse(localStorage.getItem('dc_repos') || '[]');
+let activeId  = null;
+let history   = [];   // [{role:'user'|'assistant', content:''}]
+let waiting   = false;
+
+const TYPING_STATUSES = [
+  'Analyzing your code…',
+  'Reading repository files…',
+  'Reasoning through the codebase…',
+  'Almost there…',
+  'Generating response…',
+];
+let typingTimer = null;
+
+/* ═══════════════════════════════════════════════════════════
+   DOM REFS
+═══════════════════════════════════════════════════════════ */
+const $sidebar      = document.getElementById('sidebar');
+const $overlay      = document.getElementById('overlay');
+const $repoList     = document.getElementById('repo-list');
+const $repoEmpty    = document.getElementById('repo-empty');
+const $formWrap     = document.getElementById('add-repo-form');
+const $repoInput    = document.getElementById('repo-input');
+const $branchInput  = document.getElementById('branch-input');
+const $addBtn       = document.getElementById('add-repo-btn');
+const $messages     = document.getElementById('messages');
+const $emptyState   = document.getElementById('empty-state');
+const $typingRow    = document.getElementById('typing-row');
+const $typingStatus = document.getElementById('typing-status-text');
+const $msgInput     = document.getElementById('msg-input');
+const $sendBtn      = document.getElementById('send-btn');
+const $badge        = document.getElementById('active-repo-badge');
+const $badgeName    = document.getElementById('active-repo-name');
+const $clearBtn     = document.getElementById('clear-btn');
+const $toast        = document.getElementById('toast');
+const $hamburger    = document.getElementById('hamburger');
+
+/* ═══════════════════════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════════════════════ */
+function saveRepos() { localStorage.setItem('dc_repos', JSON.stringify(repos)); }
+
+function showToast(msg, duration = 2800) {
+  $toast.textContent = msg;
+  $toast.classList.add('show');
+  setTimeout(() => $toast.classList.remove('show'), duration);
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+function now() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* Simple markdown-ish renderer: code blocks + inline code + bold */
+function renderContent(text) {
+  // fenced code blocks
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><code>${escapeHtml(code.trim())}</code></pre>`);
+  // inline code
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // bold
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  // newlines → <br> (outside pre tags)
+  text = text.split(/(<pre[\s\S]*?<\/pre>)/g).map((part, i) =>
+    i % 2 === 0 ? part.replace(/\n/g, '<br>') : part
+  ).join('');
+  return text;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TYPING INDICATOR
+═══════════════════════════════════════════════════════════ */
+function showTyping() {
+  $typingRow.classList.add('show');
+  let idx = 0;
+  $typingStatus.textContent = TYPING_STATUSES[0];
+  typingTimer = setInterval(() => {
+    idx = (idx + 1) % TYPING_STATUSES.length;
+    $typingStatus.style.opacity = '0';
+    setTimeout(() => {
+      $typingStatus.textContent = TYPING_STATUSES[idx];
+      $typingStatus.style.opacity = '1';
+    }, 180);
+  }, 2600);
+  scrollBottom();
+}
+
+function hideTyping() {
+  $typingRow.classList.remove('show');
+  clearInterval(typingTimer);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER REPOS
+═══════════════════════════════════════════════════════════ */
+function renderRepos() {
+  // Remove all repo items (not the empty message)
+  $repoList.querySelectorAll('.repo-item').forEach(el => el.remove());
+  $repoEmpty.style.display = repos.length ? 'none' : '';
+
+  repos.forEach(repo => {
+    const item = document.createElement('div');
+    item.className = 'repo-item' + (repo.id === activeId ? ' active' : '');
+    item.setAttribute('role', 'listitem');
+    item.dataset.id = repo.id;
+    item.innerHTML = `
+      <div class="repo-icon" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+      </div>
+      <div class="repo-info">
+        <div class="repo-name">${escapeHtml(repo.name)}</div>
+        <div class="repo-meta">
+          <span class="status-dot ${repo.status}" title="${repo.status}"></span>
+          <span class="repo-branch">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+            ${escapeHtml(repo.branch)}
+          </span>
+        </div>
+      </div>
+      <div class="repo-actions">
+        <button class="repo-act-btn delete-btn" title="Remove" aria-label="Remove ${escapeHtml(repo.name)}">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+      </div>
+    `;
+
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.delete-btn')) return;
+      selectRepo(repo.id);
+    });
+    item.querySelector('.delete-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteRepo(repo.id);
+    });
+    $repoList.appendChild(item);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REPO ACTIONS
+═══════════════════════════════════════════════════════════ */
+function selectRepo(id) {
+  if (activeId === id) return;
+  activeId = id;
+  history = [];
+
+  const repo = repos.find(r => r.id === id);
+  $badgeName.textContent = repo.name;
+  $badge.style.display = '';
+  $msgInput.disabled   = false;
+  $sendBtn.disabled    = false;
+  $msgInput.placeholder = `Ask about ${repo.name}…`;
+
+  // clear messages
+  $messages.innerHTML = '';
+  renderRepos();
+  closeSidebar();
+
+  // welcome message
+  setTimeout(() => {
+    addMessage('assistant',
+      `Repository **${repo.name}** (branch: \`${repo.branch}\`) is selected.\n\nWhat would you like to know about the codebase?`
+    );
+  }, 120);
+}
+
+async function addRepoFromForm() {
+  const raw    = $repoInput.value.trim();
+  const branch = $branchInput.value.trim() || 'main';
+  if (!raw) { $repoInput.focus(); return; }
+  if (!/^[\w.\-]+\/[\w.\-]+$/.test(raw)) {
+    showToast('⚠ Format should be user/repo'); return;
+  }
+  if (repos.find(r => r.name === raw && r.branch === branch)) {
+    showToast('Repository already added'); return;
+  }
+
+  const repo = { id: uid(), name: raw, branch, status: 'loading' };
+  repos.push(repo); saveRepos(); renderRepos();
+
+  $addBtn.classList.add('loading');
+  $addBtn.textContent = 'Ingesting…';
+
+  const _svgPlus = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+  let succeeded = false;
+  try {
+    // Backend: POST /ingest/{user/repo} — repo as URL path param, no request body
+    const res = await fetch(API.ingest + '/' + raw, { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.error || 'HTTP ' + res.status);
+    }
+    repo.status    = 'ready';
+    repo.backendId = raw;
+    showToast('✓ ' + raw + ' ingested successfully');
+    succeeded = true;
+  } catch (e) {
+    repo.status = 'error';
+    showToast('✗ Ingestion failed: ' + e.message);
+    $repoInput.value = raw;  // restore so user can retry
+  } finally {
+    saveRepos(); renderRepos();
+    $addBtn.classList.remove('loading');
+    $addBtn.innerHTML = _svgPlus + ' Add Repository';
+    if (succeeded) {
+      $repoInput.value   = '';
+      $branchInput.value = 'main';
+      $formWrap.classList.add('hidden');
+    }
+  }
+}
+
+function deleteRepo(id) {
+  repos = repos.filter(r => r.id !== id); saveRepos();
+  if (activeId === id) {
+    activeId = null;
+    history  = [];
+    $messages.innerHTML = '';
+    $messages.appendChild($emptyState);
+    $emptyState.style.display = '';
+    $badge.style.display = 'none';
+    $msgInput.disabled = true;
+    $sendBtn.disabled  = true;
+    $msgInput.placeholder = 'Ask anything about your code…';
+  }
+  renderRepos();
+  showToast('Repository removed');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CHAT
+═══════════════════════════════════════════════════════════ */
+function addMessage(role, content) {
+  // Remove empty state if present
+  if ($emptyState.parentNode === $messages) {
+    $messages.removeChild($emptyState);
+  }
+
+  const row = document.createElement('div');
+  row.className = `msg-row ${role === 'user' ? 'user' : 'ai'}`;
+  row.setAttribute('role', 'article');
+
+  const avatarLabel = role === 'user' ? 'You' : 'AI';
+  row.innerHTML = `
+    <div class="avatar ${role === 'user' ? 'usr' : 'ai'}" aria-hidden="true">${avatarLabel}</div>
+    <div>
+      <div class="bubble">${renderContent(content)}</div>
+      <div class="msg-time">${now()}</div>
+    </div>
+  `;
+  $messages.appendChild(row);
+  scrollBottom();
+  return row;
+}
+
+function scrollBottom() {
+  requestAnimationFrame(() => {
+    $messages.scrollTop = $messages.scrollHeight;
+    // Also scroll typing row into view
+    $typingRow.scrollIntoView && $typingRow.scrollIntoView({ block: 'nearest' });
+  });
+}
+
+async function sendMessage() {
+  if (waiting || !activeId) return;
+  const text = $msgInput.value.trim();
+  if (!text) return;
+
+  $msgInput.value = '';
+  $msgInput.style.height = '';
+  waiting = true;
+  $sendBtn.disabled = true;
+  $msgInput.disabled = true;
+
+  addMessage('user', text);
+  history.push({ role: 'user', content: text });
+
+  showTyping();
+
+  try {
+    const repo = repos.find(r => r.id === activeId);
+    const repoName = repo?.backendId || repo?.name || activeId;
+
+    // Backend: POST /retrieval/  { query, repo }
+    const res = await fetch(API.chat + '/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: text, repo: repoName }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.error || 'HTTP ' + res.status);
+    }
+    const data = await res.json();
+    // backend returns { response: "..." }
+    const reply = data.response || data.reply || data.content || data.message || 'No response received.';
+
+    hideTyping();
+    addMessage('assistant', reply);
+    history.push({ role: 'assistant', content: reply });
+
+  } catch (err) {
+    hideTyping();
+    // Demo fallback — simulated reply
+    const demo = getDemoReply(text, repos.find(r => r.id === activeId));
+    addMessage('assistant', demo + '\n\n> ⚠ Backend error: ' + err.message);
+    history.push({ role: 'assistant', content: demo });
+  } finally {
+    waiting = false;
+    $sendBtn.disabled  = false;
+    $msgInput.disabled = false;
+    $msgInput.focus();
+  }
+}
+
+/* Demo replies when backend is not connected */
+function getDemoReply(q, repo) {
+  const r = repo?.name || 'this repo';
+  const lq = q.toLowerCase();
+  if (lq.includes('architecture') || lq.includes('structure'))
+    return `**Architecture overview for \`${r}\`**\n\nBased on the repository structure, this project follows a standard layered architecture:\n\n- \`src/\` — main source code\n- \`tests/\` — unit and integration tests\n- \`docs/\` — documentation\n\nThe entry point is \`index.js\` which bootstraps the application. Modules are organized by feature domain.\n\n> 💡 Connect your backend at \`/api/chat\` to get real answers from your codebase.`;
+  if (lq.includes('bug') || lq.includes('issue'))
+    return `**Potential issues found in \`${r}\`**\n\nHere are some common patterns to watch for:\n\n1. Uncaught async errors in promise chains\n2. Missing input validation on public API endpoints\n3. Possible memory leaks in event listeners\n\n\`\`\`js\n// Example: always handle rejections\nfetch(url)\n  .then(res => res.json())\n  .catch(err => console.error(err)); // ✓\n\`\`\`\n\n> 💡 This is a demo response. Real analysis requires your backend.`;
+  if (lq.includes('api') || lq.includes('endpoint'))
+    return `**API Endpoints in \`${r}\`**\n\n| Method | Path | Description |\n|--------|------|-------------|\n| GET | \`/api/health\` | Health check |\n| POST | \`/api/chat\` | Chat with codebase |\n| POST | \`/api/repo/ingest\` | Ingest repository |\n\n> 💡 Plug in your backend to get the real endpoint list.`;
+  return `I can see you're asking about **${r}**: "${q}"\n\nThis is running in **demo mode** since no backend is connected yet.\n\nTo get real AI-powered answers:\n1. Set \`API.chat\` in the script to your endpoint\n2. Your endpoint should accept \`{ repoId, messages }\` and return \`{ reply }\`\n3. Reload and start chatting!\n\nLet me know if you have questions about integration.`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EVENTS
+═══════════════════════════════════════════════════════════ */
+// Toggle form
+document.getElementById('toggle-form-btn').addEventListener('click', () => {
+  const hidden = $formWrap.classList.toggle('hidden');
+  if (!hidden) { setTimeout(() => $repoInput.focus(), 50); }
+});
+
+// Add repo button
+$addBtn.addEventListener('click', addRepoFromForm);
+
+// Enter in inputs
+[$repoInput, $branchInput].forEach(el => {
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') addRepoFromForm(); });
+});
+
+// Send message
+$sendBtn.addEventListener('click', sendMessage);
+$msgInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+// Auto-resize textarea
+$msgInput.addEventListener('input', () => {
+  $msgInput.style.height = 'auto';
+  $msgInput.style.height = Math.min($msgInput.scrollHeight, 160) + 'px';
+});
+
+// Clear chat
+$clearBtn.addEventListener('click', () => {
+  if (!activeId || waiting) return;
+  history = [];
+  $messages.innerHTML = '';
+  const repo = repos.find(r => r.id === activeId);
+  if (repo) {
+    addMessage('assistant', `Chat cleared. **${repo.name}** is still selected — ask me anything!`);
+    history.push({ role: 'assistant', content: `Chat cleared.` });
+  }
+});
+
+// Quick prompts
+document.getElementById('quick-prompts').addEventListener('click', e => {
+  const pill = e.target.closest('.quick-pill');
+  if (!pill) return;
+  const prompt = pill.dataset.prompt;
+  if (!activeId) { showToast('Select a repository first'); return; }
+  $msgInput.value = prompt;
+  sendMessage();
+});
+
+// Mobile sidebar
+$hamburger.addEventListener('click', () => {
+  $sidebar.classList.toggle('open');
+  $overlay.classList.toggle('show');
+});
+$overlay.addEventListener('click', closeSidebar);
+function closeSidebar() {
+  $sidebar.classList.remove('open');
+  $overlay.classList.remove('show');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════ */
+renderRepos();
+
+// Re-show empty state if messages div is empty
+if ($messages.children.length === 0) {
+  $messages.appendChild($emptyState);
+}
+</script>
+</body>
+</html>
