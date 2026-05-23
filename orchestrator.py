@@ -1,4 +1,4 @@
-from ingestion_pipeline import load_documents, chunking_documents, create_vector_store
+from ingestion_pipeline import load_documents, chunking_documents, create_vector_collection
 from retrieval_pipeline import retrieval_pipeline, messages
 from langchain_core.messages import AIMessage, HumanMessage 
 from langchain_ollama import ChatOllama
@@ -8,7 +8,7 @@ def orchestrator():
     """This function orchestrates the entire process of ingestion and retrieval."""
     print("Welcome to the Developer Copilot!")
     print("To begin enter your github repository ([owner/repo] for example: langchain-ai/langchain)")
-    repository = input("Repository: ")
+    repository = str(input("Repository: "))
     print("----------------------------------------")
     print("Loading documents from the repository...")
     print("----------------------------------------")
@@ -23,20 +23,20 @@ def orchestrator():
     print("----------------------------------------")
 
     print("Creating vector store...")
-    vector_store = create_vector_store(chunks)
+    vector_store = create_vector_collection(repository, chunks)
     print("----------------------------------------")
 
     print("Now you can ask questions about the codebase!")
     print("To exit, type 'exit()'\n\n")
 
     query = input("Enter your query: ")
-    response = retrieval_pipeline(query)
+    response = retrieval_pipeline(query, repository)
     print("----------------------------------------")
     print("Response:", response.content)
 
     messages.append(AIMessage(content=response.content))
     while True:
-        if query.lower() == "exit":
+        if query.lower().strip() == "exit":
             print("Exiting the Developer Copilot. Goodbye!")
             break
         query = input("\n\nEnter follow-up question: ")
@@ -48,9 +48,3 @@ def orchestrator():
 
 if __name__ == "__main__":
     orchestrator()
-
-    try:
-        os.remove("db/chroma_db")
-        print("Cleaned up vector store.")
-    except Exception as e:
-        print("Error cleaning up vector store:", e)

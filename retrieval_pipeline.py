@@ -10,22 +10,6 @@ messages = [
         SystemMessage(content="You are a helpful assistant for software developers. You answer questions based on the provided documents. If the answer is not found in the provided documents, you say 'I don't know'. Always provide concise and accurate answers. Provide code snippets if necessary.")
     ]
 
-db = Chroma(
-        embedding_function=embeddings,
-        persist_directory=persistent_directory,
-        # collection_metadata={"hnsw:space": "cosine"},
-    )
-
-retriever = db.as_retriever(
-        search_type="mmr", 
-        search_kwargs={
-            "k": 5,
-            "fetch_k": 20,
-            "lambda_mult":0.6 
-            }
-        )
-
-
 def generate_pipeline(query):
     """This is a function to create a sample code for retrieval."""
 
@@ -45,10 +29,25 @@ def generate_pipeline(query):
     return hypothetical_doc.content
 
 
-def retrieve_documents(query):
+def retrieve_documents(query, hypothetical_query, repo_name):
     """This function retrieves relevant documents based on the query"""
+    db = Chroma(
+            embedding_function=embeddings,
+            persist_directory=persistent_directory,
+            collection_name=repo_name.replace("/", "_"),
+            # collection_metadata={"hnsw:space": "cosine"},
+        )
 
-    relevant_chunks = retriever.invoke(query)
+    retriever = db.as_retriever(
+            search_type="mmr", 
+            search_kwargs={
+                "k": 5,
+                "fetch_k": 20,
+                "lambda_mult":0.6 
+                }
+            )
+
+    relevant_chunks = retriever.invoke(query + "\n\n" + hypothetical_query)
 
     # for i, chunk in enumerate(relevant_chunks):
     #     print(f"Chunk {i+1}:")
@@ -56,7 +55,7 @@ def retrieve_documents(query):
     #     print(f"content: {chunk.page_content}")
     #     print("-------------------------------------------------------")
 
-    return relevant_chunks, retriever
+    return relevant_chunks
 
 
 def generate_response(retrieved_docs, query):
@@ -75,9 +74,9 @@ def generate_response(retrieved_docs, query):
     return result
 
 
-def retrieval_pipeline(query):
+def retrieval_pipeline(query, repo_name):
     hypothetical_query = generate_pipeline(query)
-    retrieved_docs = retrieve_documents(hypothetical_query)
+    retrieved_docs = retrieve_documents(query, hypothetical_query, repo_name)
     response = generate_response(retrieved_docs, query)
     
     return response

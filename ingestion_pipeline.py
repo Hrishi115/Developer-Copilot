@@ -3,6 +3,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
+import chromadb
 from dotenv import load_dotenv
 import os
 load_dotenv()
@@ -105,26 +106,55 @@ def chunking_documents(documents: list, chunk_size=800, chunk_overlap=100) -> li
     print("Chunking completed. Total chunks created:", len(chunks))
     return chunks
 
-def create_vector_store(chunks: list, persistent_directory: str = "db/chroma_db") -> None:
-    """This function creates a vector store from the chunks."""
+# def create_vector_store(chunks: list, persistent_directory: str = "db/chroma_db") -> None:
+#     """This function creates a vector store from the chunks."""
+    
+#     embeddings = OllamaEmbeddings(model="embeddinggemma")
+
+#     vector_store = Chroma.from_documents(
+#         embedding=embeddings,
+#         documents=chunks,
+#         persist_directory=persistent_directory,
+#         collection_metadata={"hnsw:space": "cosine"},
+#     )
+
+#     print("Created Vector Store Successfully!")
+
+#     return vector_store
+
+def create_vector_collection(repo_name: str, chunks: list, persistent_directory: str = "db/chroma_db") -> None:
+    """This function creates a vector collection from the chunks."""
     
     embeddings = OllamaEmbeddings(model="embeddinggemma")
+    collection_name = repo_name.replace("/", "_")
 
+    client = chromadb.PersistentClient(persistent_directory)
+    existing = [c.name for c in client.list_collections()]
+
+    if collection_name in existing:
+        print(f"Vector Collection for {repo_name} already exists. Skipping creation.")
+        return Chroma(
+            embedding_function=embeddings,
+            persist_directory=persistent_directory,
+            collection_name=collection_name,
+        )
+    
     vector_store = Chroma.from_documents(
         embedding=embeddings,
         documents=chunks,
         persist_directory=persistent_directory,
+        collection_name=collection_name,
         collection_metadata={"hnsw:space": "cosine"},
     )
 
-    print("Created Vector Store Successfully!")
+    print(f"Created Vector Collection for {repo_name} Successfully!")
 
     return vector_store
 
-def ingest_pipeline():
+def ingest_pipeline(url: str):
 
-    repo_name = input("Enter the GitHub repository name (e.g., owner/repo): ")
-    docs = load_documents(repo_name)
+    # repo_name = input("Enter the GitHub repository name (e.g., owner/repo): ")
+    docs = load_documents(url)
 
     chunks = chunking_documents(docs)
     
@@ -136,4 +166,5 @@ def ingest_pipeline():
     
     # print(docs)
 
-    vector_store = create_vector_store(chunks)
+    vector_store = create_vector_collection(url, chunks)
+
