@@ -1,14 +1,14 @@
 from langchain_community.document_loaders import GithubFileLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
-import chromadb
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 import os
-
+from database.vectorstore import store_embeddings_supabase, supabase
+from services.models import Models
+# from supabase import create_client
 load_dotenv()
 
 EXT_TO_LANGUAGE = {
@@ -32,9 +32,9 @@ IGNORED_FILES = {
 }
 
 # ── Single shared embeddings instance (avoids re-init overhead per call) ──────
-@lru_cache(maxsize=1)
-def get_embeddings() -> OllamaEmbeddings:
-    return OllamaEmbeddings(model="embeddinggemma")
+# @lru_cache(maxsize=1)
+# def get_embeddings() -> OllamaEmbeddings:
+#     return OllamaEmbeddings(model="embeddinggemma")
 
 
 def should_load(path: str) -> bool:
@@ -46,11 +46,13 @@ def should_load(path: str) -> bool:
     return any(path.endswith(ext) for ext in ALLOWED_EXTENSIONS)
 
 
-def _collection_exists(repo_name: str, persistent_directory: str) -> bool:
+def _collection_exists(repo_name: str) -> bool:
     """Check if a Chroma collection already exists for this repo."""
-    client = chromadb.PersistentClient(persistent_directory)
     collection_name = repo_name.replace("/", "_")
-    return collection_name in [c.name for c in client.list_collections()]
+    return supabase.table("documents").select("*").eq("source", collection_name).execute().data
+
+    # client = chromadb.PersistentClient(persistent_directory)
+    # return collection_name in [c.name for c in client.list_collections()]
 
 
 def _fetch_file(loader: GithubFileLoader, file: dict, repo_name: str) -> Document | None:
@@ -146,46 +148,45 @@ def chunking_documents(
     return all_chunks
 
 
-def create_vector_collection(
-    repo_name: str,
-    chunks: list[Document],
-    persistent_directory: str = "db/chroma_db",
-    batch_size: int = 100,
-) -> Chroma:
-    """
-    Embed and store chunks in Chroma in controlled batches.
-    batch_size=100 prevents OOM on large repos — Ollama processes
-    at most 100 chunks at a time instead of all at once.
-    """
-    embeddings = get_embeddings()
-    collection_name = repo_name.replace("/", "_")
+# def create_vector_collection(
+#     repo_name: str,
+#     chunks: list[Document],
+#     persistent_directory: str = "db/chroma_db",
+#     batch_size: int = 100,
+# ) -> Chroma:
+#     """
+#     Embed and store chunks in Chroma in controlled batches.
+#     batch_size=100 prevents OOM on large repos — Ollama processes
+#     at most 100 chunks at a time instead of all at once.
+#     """
+#     embeddings = get_embeddings()
+#     collection_name = repo_name.replace("/", "_")
 
-    # Batch-add documents to prevent memory spikes
-    vector_store = None
-    for i in range(0, len(chunks), batch_size):
-        batch = chunks[i : i + batch_size]
-        print(f"Embedding batch {i // batch_size + 1} / {-(-len(chunks) // batch_size)}")
+#     # Batch-add documents to prevent memory spikes
+#     vector_store = None
+#     for i in range(0, len(chunks), batch_size):
+#         batch = chunks[i : i + batch_size]
+#         print(f"Embedding batch {i // batch_size + 1} / {-(-len(chunks) // batch_size)}")
 
-        if vector_store is None:
-            vector_store = Chroma.from_documents(
-                documents=batch,
-                embedding=embeddings,
-                persist_directory=persistent_directory,
-                collection_name=collection_name,
-                collection_metadata={"hnsw:space": "cosine"},
-            )
-        else:
-            vector_store.add_documents(batch)
+#         if vector_store is None:
+#             vector_store = Chroma.from_documents(
+#                 documents=batch,
+#                 embedding=embeddings,
+#                 persist_directory=persistent_directory,
+#                 collection_name=collection_name,
+#                 collection_metadata={"hnsw:space": "cosine"},
+#             )
+#         else:
+#             vector_store.add_documents(batch)
 
-    print(f"Created vector collection for {repo_name} successfully.")
-    return vector_store
+#     print(f"Created vector collection for {repo_name} successfully.")
+#     return vector_store
 
 
 def ingest_pipeline(
     url: str,
-    persistent_directory: str = "db/chroma_db",
     force: bool = False,
-) -> Chroma:
+):
     """
     Full ingestion pipeline with an early-exit guard.
 
@@ -195,15 +196,12 @@ def ingest_pipeline(
         force:                Re-ingest even if the collection already exists.
     """
     # ── Early exit: skip load + chunk + embed if already ingested ─────────────
-    if not force and _collection_exists(url, persistent_directory):
+    if not force and _collection_exists(url):
         print(f"Collection for {url} already exists. Pass force=True to re-ingest.")
-        embeddings = get_embeddings()
-        return Chroma(
-            embedding_function=embeddings,
-            persist_directory=persistent_directory,
-            collection_name=url.replace("/", "_"),
-        )
+        return {"message": f"Collection for {url} already exists. Ingestion skipped."}
 
     docs = load_documents(url)
     chunks = chunking_documents(docs)
-    return create_vector_collection(url, chunks, persistent_directory)
+    store_embeddings_supabase(url, chunks)
+
+    return {"message": f"Ingestion completed for {url}. Total chunks: {len(chunks)}"}

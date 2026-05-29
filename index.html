@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <style>
   /* ── Reset & Base ──────────────────────────────────── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -396,6 +397,34 @@
     font-size: 12px;
     line-height: 1.6;
   }
+  .bubble ul, .bubble ol {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+.bubble li { margin: 3px 0; }
+.bubble h1, .bubble h2, .bubble h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 10px 0 4px;
+  color: var(--text-hi);
+}
+.bubble blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+  color: var(--text-md);
+  margin: 6px 0;
+}
+.bubble table {
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  margin: 8px 0;
+}
+.bubble th, .bubble td {
+  border: 1px solid var(--border-mid);
+  padding: 5px 10px;
+}
+.bubble th { background: var(--bg-input); }
   .msg-time { font-size: 10px; color: var(--text-lo); margin-top: 4px; font-family: var(--font-mono); }
   .msg-row.user .msg-time { text-align: right; }
 
@@ -731,20 +760,14 @@ function escapeHtml(text) {
   return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-/* Simple markdown-ish renderer: code blocks + inline code + bold */
+// Configure marked once
+marked.setOptions({
+  breaks: true,       // \n → <br> (matches chat feel)
+  gfm: true,          // GitHub-flavored: tables, strikethrough, etc.
+});
+
 function renderContent(text) {
-  // fenced code blocks
-  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
-    `<pre><code>${escapeHtml(code.trim())}</code></pre>`);
-  // inline code
-  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-  // bold
-  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  // newlines → <br> (outside pre tags)
-  text = text.split(/(<pre[\s\S]*?<\/pre>)/g).map((part, i) =>
-    i % 2 === 0 ? part.replace(/\n/g, '<br>') : part
-  ).join('');
-  return text;
+  return marked.parse(text);
 }
 
 /* ═══════════════════════════════════════════════════════════
