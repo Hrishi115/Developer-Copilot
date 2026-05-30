@@ -30,7 +30,7 @@ class UserRequestModel(BaseModel):
     full_name: str = Field(min_length=2, max_length=100)
     email: str = Field(min_length=5, max_length=100)
     password: str = Field(min_length=2, max_length=10)
-    role: str = Field(min_length=2, max_length=20)
+    role: str = Field(min_length=2, max_length=20, default="user")
 
     @field_validator("role")
     @classmethod
@@ -43,6 +43,11 @@ class UserRequestModel(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class LoginRequestModel(BaseModel):
+    email: str
+    password: str
 
 def get_user_from_token(token: str):
     to_decode = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -74,8 +79,9 @@ db_dependancy = Annotated[Session, Depends(get_db)]
 
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_user(user: UserRequestModel, db: db_dependancy):
+    print("Password length:", len(user.password))
     existing_user = db.query(users).filter(users.username == user.username).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists")
@@ -84,24 +90,29 @@ async def register_user(user: UserRequestModel, db: db_dependancy):
         username=user.username,
         full_name=user.full_name,
         email=user.email,
-        hashed_password=bcrypt_context.hash(user.password),
-        role=user.role,
+        password=bcrypt_context.hash(user.password),
+        role="user",
         is_active=True
     )
 
     db.add(user_to_register)
     db.commit()
+    
+    return {
+        "email": user.email,
+        "username": user.username,
+    }
 
 @router.post("/login", response_model=Token, status_code=status.HTTP_200_OK)
-async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependancy):
-    user = db.query(users).filter(users.username == form_data.username).first()
+async def login_user(form_data: LoginRequestModel, db: db_dependancy):
+    user = db.query(users).filter(users.email == form_data.email).first()
     if user is None: 
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Username")
-    if not bcrypt_context.verify(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Email. Try Logging in with correct email or register a new account")
+    if not bcrypt_context.verify(form_data.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Password")
     
     token_data = {
-        "sub": user.username,
+        "sub": user.email,
         "id": user.id,
         "role": user.role
     }
@@ -112,6 +123,7 @@ async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
         "access_token": access_token,
         "token_type": "bearer"
     }
+
 
 @router.get("/me", status_code=status.HTTP_200_OK)
 async def get_current_user(user: Annotated[dict, Depends(get_currentuser)], db: db_dependancy):

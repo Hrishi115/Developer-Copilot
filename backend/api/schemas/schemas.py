@@ -1,5 +1,6 @@
 from database.database import Base
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from datetime import datetime, timezone
 
 class User(Base):
     __tablename__ = "users"
@@ -7,16 +8,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True)
     email = Column(String, unique=True)
-    hashed_password = Column(String)
+    password = Column(String)
     full_name = Column(String)
     role = Column(String, default="user")
     is_active = Column(Boolean, default=True)
-
-class Task(Base):
-    __tablename__ = "tasks"
-
-    task_id = Column(Integer, primary_key=True, index=True)
-    task_title = Column(String)
-    task_description = Column(String)
-    owner_id = Column(Integer)
-    status = Column(Boolean, default=False)
+    ingest_query_count = Column(Integer, default=0)
+    retrieval_query_count = Column(Integer, default=0)
+    query_reset_at = Column(DateTime(timezone = True), default=datetime.now(timezone.utc))

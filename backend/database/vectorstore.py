@@ -13,6 +13,7 @@ def store_embeddings_supabase(
     repo_name: str,
     chunks: list[Document],
     batch_size: int = 100,
+    user_id: int = None
 ):
     """
     Embed and store chunks in Supabase in controlled batches.
@@ -38,6 +39,7 @@ def store_embeddings_supabase(
                 "embedding": embedding,
                 "source": collection_name,
                 "file_path": metadata.get("source"),
+                "user_id": user_id
             }) 
         supabase.table("documents").insert(rows).execute()
 

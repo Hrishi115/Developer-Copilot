@@ -185,6 +185,7 @@ def chunking_documents(
 
 def ingest_pipeline(
     url: str,
+    user_id: int,
     force: bool = False,
 ):
     """
@@ -198,10 +199,10 @@ def ingest_pipeline(
     # ── Early exit: skip load + chunk + embed if already ingested ─────────────
     if not force and _collection_exists(url):
         print(f"Collection for {url} already exists. Pass force=True to re-ingest.")
-        return {"message": f"Collection for {url} already exists. Ingestion skipped."}
+        return {"message": f"Collection for {url} already exists. Ingestion skipped.", "ingestion_skipped": True}
 
     docs = load_documents(url)
     chunks = chunking_documents(docs)
-    store_embeddings_supabase(url, chunks)
+    store_embeddings_supabase(url, chunks, user_id = user_id)
 
-    return {"message": f"Ingestion completed for {url}. Total chunks: {len(chunks)}"}
+    return {"message": f"Ingestion completed for {url}. Total chunks: {len(chunks)}", "ingestion_skipped": False}

@@ -7,7 +7,6 @@ from langchain_core.documents import Document
 # from concurrent.futures import ThreadPoolExecutor, as_completed
 from services.models import Models
 from database.vectorstore import supabase
-import asyncio
 
 
 
@@ -36,15 +35,6 @@ import asyncio
 
 # ── System prompt (defined once, not rebuilt on every call) ───────────────────
 
-SYSTEM_MESSAGE = SystemMessage(
-    content=(
-        "You are a helpful assistant for software developers. "
-        "You answer questions based on the provided documents. "
-        "If the answer is not found in the provided documents, say 'I don't know'. "
-        "Always provide concise and accurate answers. Provide code snippets if necessary."
-    )
-)
-
 HYDE_PROMPT = PromptTemplate.from_template(
     """You are a senior developer. Given the user's question about a codebase,
 write a SHORT hypothetical code snippet that would answer it.
@@ -68,12 +58,11 @@ Include code snippets if necessary. If the answer is not found, say 'I don't kno
 
 def _generate_hypothetical_doc(query: str) -> str:
     """HyDE step: generate a hypothetical code snippet to improve retrieval."""
-    model = Models.get_llm()
-    result = model.generate_content(HYDE_PROMPT.format(query=query))
-    return result.text
+    result = Models.get_llm(HYDE_PROMPT.format(query=query))
+    return result
 
 
-def _retrieve_documents(query: str, hypothetical_query: str, repo_name: str) -> list[Document]:
+def _retrieve_documents(query: str, hypothetical_query: str, repo_name: str, user_id: int) -> list[Document]:
     """MMR retrieval using the combined real + hypothetical query."""
     # db = get_vectorstore(repo_name)
     # Combine real query + HyDE doc for richer embedding signal
@@ -94,8 +83,9 @@ def _retrieve_documents(query: str, hypothetical_query: str, repo_name: str) -> 
     try:
         result = supabase.rpc("match_documents", {
             "query_embedding":query_embedding_str,
-            "match_count": 20,
-            "filter_source": repo_name.replace("/", "_"), 
+            "match_count": 10,
+            "filter_source": repo_name.replace("/", "_"),
+            "user_id": user_id
         }).execute()
 
         print(f"[DEBUG] Result: {result}")
@@ -128,6 +118,7 @@ def _retrieve_documents(query: str, hypothetical_query: str, repo_name: str) -> 
                 metadata={
                     "source": row.get("file_path"),
                     "repo_name": row.get("source"),
+                    "user_id": row.get("user_id")
                 },
             )
         )
@@ -150,26 +141,21 @@ def _format_context(docs: list[Document]) -> str:
 
 def _generate_response(retrieved_docs: list[Document], query: str):
     """Final answer generation. Builds a fresh message list per call (thread-safe)."""
-    model = Models.get_llm()
+    
     context = _format_context(retrieved_docs)
 
     # Build messages fresh each call — the original mutated a module-level list,
     # which would bleed conversation history across unrelated user queries.
     full_prompt = f"""
-        "You are a helpful assistant for software developers. "
-        "You answer questions based on the provided documents. "
-        "If the answer is not found in the provided documents, say 'I don't know'. "
-        "Always provide concise and accurate answers. Provide code snippets if necessary."
-    
     {ANSWER_PROMPT.format(query=query, context=context)}
     """
 
-    output = model.generate_content(full_prompt)
-    return output.text
+    output = Models.get_llm(full_prompt)
+    return output
 
 # ── Public entry point ─────────────────────────────────────────────────────────
 
-def retrieval_pipeline(query: str, repo_name: str) -> str:
+def retrieval_pipeline(query: str, repo_name: str, user_id: int) -> str:
     """
     Run HyDE generation and document retrieval in parallel, then generate answer.
 
@@ -183,7 +169,7 @@ def retrieval_pipeline(query: str, repo_name: str) -> str:
     #     hypothetical_query = hyde_future.result()
 
     hypothetical_query = _generate_hypothetical_doc(query)
-    retrieved_docs = _retrieve_documents(query, hypothetical_query, repo_name)
+    retrieved_docs = _retrieve_documents(query, hypothetical_query, repo_name, user_id)
     return _generate_response(retrieved_docs, query)
 
 
