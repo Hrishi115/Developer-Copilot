@@ -49,7 +49,7 @@ class Models:
     
         with OpenRouter(api_key=os.getenv("OPENROUTER_API_KEY", "")) as client:
             response = client.chat.send(
-                model="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+                model="poolside/laguna-m.1:free",
                 messages = [
                     {"role": "system", "content": SYSTEM_MESSAGE},
                     {"role": "user", "content": prompt}
