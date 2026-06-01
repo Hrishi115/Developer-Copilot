@@ -32,7 +32,7 @@ def fake_current_user():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          
+    allow_origins=["https://developer-copilot.vercel.app/"],          
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
