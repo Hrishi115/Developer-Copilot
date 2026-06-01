@@ -12,6 +12,14 @@ logger = get_logger()
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://developer-copilot.vercel.app/"],       
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Application started")
@@ -30,15 +38,7 @@ def fake_current_user():
         "role": "admin"
     }
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://developer-copilot.vercel.app/"],       
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
-)
-
-app.dependency_overrides[auth.get_currentuser] = fake_current_user
+# app.dependency_overrides[auth.get_currentuser] = fake_current_user
 
 app.include_router(ingest.router)
 app.include_router(retrieval.router)
